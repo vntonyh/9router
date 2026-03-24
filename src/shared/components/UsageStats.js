@@ -184,15 +184,23 @@ export default function UsageStats() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Read all filter/sort state from URL params for refresh persistence
   const sortBy = searchParams.get("sortBy") || "rawModel";
   const sortOrder = searchParams.get("sortOrder") || "asc";
+  const tableView = searchParams.get("view") || "model";
+  const period = searchParams.get("period") || "7d";
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
-  const [tableView, setTableView] = useState("model");
   const [providers, setProviders] = useState([]);
-  const [period, setPeriod] = useState("7d");
+
+  // Helper to update URL params without scroll
+  const setParam = useCallback((key, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(key, value);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
 
   // Fetch connected providers once, deduplicate by provider type
   useEffect(() => {
@@ -399,7 +407,7 @@ export default function UsageStats() {
           {PERIODS.map((p) => (
             <button
               key={p.value}
-              onClick={() => setPeriod(p.value)}
+              onClick={() => setParam("period", p.value)}
               disabled={fetching}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${period === p.value ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
             >
@@ -436,7 +444,7 @@ export default function UsageStats() {
         <div className="flex items-center justify-between">
           <select
             value={tableView}
-            onChange={(e) => setTableView(e.target.value)}
+            onChange={(e) => setParam("view", e.target.value)}
             className="px-3 py-1.5 rounded-lg border border-border bg-bg-subtle text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             {TABLE_OPTIONS.map((opt) => (
