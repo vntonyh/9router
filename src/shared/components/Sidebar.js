@@ -6,13 +6,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/shared/utils/cn";
 import { APP_CONFIG } from "@/shared/constants/config";
+import { MEDIA_PROVIDER_KINDS } from "@/shared/constants/providers";
 import Button from "./Button";
 import { ConfirmModal } from "./Modal";
 
 const navItems = [
   { href: "/dashboard/endpoint", label: "Endpoint", icon: "api" },
   { href: "/dashboard/providers", label: "Providers", icon: "dns" },
-  { href: "/dashboard/proxy-pools", label: "Proxy Pools", icon: "lan" },
   // { href: "/dashboard/basic-chat", label: "Basic Chat", icon: "chat" }, // Hidden
   { href: "/dashboard/combos", label: "Combos", icon: "layers" },
   { href: "/dashboard/usage", label: "Usage", icon: "bar_chart" },
@@ -26,11 +26,13 @@ const debugItems = [
 ];
 
 const systemItems = [
+  { href: "/dashboard/proxy-pools", label: "Proxy Pools", icon: "lan" },
   { href: "/dashboard/profile", label: "Settings", icon: "settings" },
 ];
 
 export default function Sidebar({ onClose }) {
   const pathname = usePathname();
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [showShutdownModal, setShowShutdownModal] = useState(false);
   const [isShuttingDown, setIsShuttingDown] = useState(false);
   const [isDisconnected, setIsDisconnected] = useState(false);
@@ -131,6 +133,43 @@ export default function Sidebar({ onClose }) {
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           ))}
+
+          {/* Media Providers accordion */}
+          {/* <button
+            onClick={() => setMediaOpen((v) => !v)}
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+              pathname.startsWith("/dashboard/media-providers")
+                ? "bg-primary/10 text-primary"
+                : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">perm_media</span>
+            <span className="text-sm font-medium flex-1 text-left">Media Providers</span>
+            <span className="material-symbols-outlined text-[14px] transition-transform" style={{ transform: mediaOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+              expand_more
+            </span>
+          </button> */}
+          {mediaOpen && (
+            <div className="pl-4">
+              {MEDIA_PROVIDER_KINDS.map((kind) => (
+                <Link
+                  key={kind.id}
+                  href={`/dashboard/media-providers/${kind.id}`}
+                  onClick={onClose}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all group",
+                    pathname.startsWith(`/dashboard/media-providers/${kind.id}`)
+                      ? "bg-primary/10 text-primary"
+                      : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">{kind.icon}</span>
+                  <span className="text-sm">{kind.label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {/* Debug section */}
           <div className="pt-4 mt-2">

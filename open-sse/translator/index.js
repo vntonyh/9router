@@ -3,6 +3,7 @@ import { ensureToolCallIds, fixMissingToolResponses } from "./helpers/toolCallHe
 import { prepareClaudeRequest } from "./helpers/claudeHelper.js";
 import { filterToOpenAIFormat } from "./helpers/openaiHelper.js";
 import { normalizeThinkingConfig } from "../services/provider.js";
+import { AntigravityExecutor } from "../executors/antigravity.js";
 
 // Registry for translators
 const requestRegistry = new Map();
@@ -32,6 +33,7 @@ function ensureInitialized() {
   require("./request/openai-to-claude.js");
   require("./request/gemini-to-openai.js");
   require("./request/openai-to-gemini.js");
+  require("./request/openai-to-vertex.js");
   require("./request/antigravity-to-openai.js");
   require("./request/openai-responses.js");
   require("./request/openai-to-kiro.js");
@@ -49,10 +51,37 @@ function ensureInitialized() {
   require("./response/ollama-to-openai.js");
 }
 
+// Strip multimodal content blocks (image/audio/video) from messages if model doesn't support them
+function stripUnsupportedMultimodal(body, multimodal = {}) {
+  if (!body.messages || !Array.isArray(body.messages)) return;
+  for (const msg of body.messages) {
+    if (!Array.isArray(msg.content)) continue;
+    msg.content = msg.content.filter(part => {
+      if (part.type === "image_url" || part.type === "image") return multimodal.image === true;
+      if (part.type === "audio_url" || part.type === "input_audio") return multimodal.audio === true;
+      return true; // keep text, tool_use, tool_result, etc.
+    });
+    // If content array becomes empty after filtering, replace with empty string to avoid API errors
+    if (msg.content.length === 0) msg.content = "";
+  }
+}
+
 // Translate request: source -> openai -> target
-export function translateRequest(sourceFormat, targetFormat, model, body, stream = true, credentials = null, provider = null, reqLogger = null) {
+export function translateRequest(sourceFormat, targetFormat, model, body, stream = true, credentials = null, provider = null, reqLogger = null, caps = null) {
   ensureInitialized();
   let result = body;
+
+  // Apply model capability guards before translation
+  if (caps) {
+    // Strip multimodal content if model doesn't support it
+    stripUnsupportedMultimodal(result, caps.multimodal || {});
+
+    // Strip thinking config if model doesn't support thinking
+    if (!caps.thinking) {
+      delete result.thinking;
+      delete result.reasoning_effort;
+    }
+  }
 
   // Normalize thinking config: remove if lastMessage is not user
   normalizeThinkingConfig(result);
@@ -94,6 +123,16 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
   if (targetFormat === FORMATS.CLAUDE) {
     const apiKey = credentials?.accessToken || credentials?.apiKey || null;
     result = prepareClaudeRequest(result, provider, apiKey);
+  }
+
+  // Antigravity cloaking: rename client tools + inject decoys (anti-ban)
+  // Skip if client is native AG (userAgent = antigravity)
+  if (provider === FORMATS.ANTIGRAVITY && body.userAgent !== FORMATS.ANTIGRAVITY) {
+    const { cloakedBody, toolNameMap } = AntigravityExecutor.cloakTools(result);
+    result = cloakedBody;
+    if (toolNameMap?.size > 0) {
+      result._toolNameMap = toolNameMap;
+    }
   }
 
   return result;
